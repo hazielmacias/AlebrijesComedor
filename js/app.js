@@ -394,7 +394,7 @@
         </div>
 
         <div class="manual-input">
-          <input id="manual-folio" placeholder="FOLIO (o escribe a mano)" maxlength="12">
+          <input id="manual-folio" placeholder="FOLIO (4 dígitos)" maxlength="4" inputmode="numeric">
           <button class="btn btn-ghost" id="btn-manual">Buscar</button>
         </div>
 
@@ -687,7 +687,7 @@
         <form class="form" id="form-crear">
           <div class="form-row">
             <div class="field"><label>Nombre completo</label><input id="c-nombre" required placeholder="Ej. Juan Pérez"></div>
-            <div class="field"><label>Folio</label><input id="c-folio" required placeholder="Ej. JUG-010" maxlength="12"></div>
+            <div class="field"><label>Folio (4 dígitos)</label><input id="c-folio" required placeholder="Ej. 0012" maxlength="4" pattern="\d{4}" inputmode="numeric" title="Solo 4 números"></div>
           </div>
           <div class="form-row">
             <div class="field">

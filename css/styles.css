@@ -822,10 +822,11 @@ tbody .folio { font-size: .78rem; }
 
 /* ------------------------------------------------------------ impresión */
 @media print {
-  @page { margin: 12mm; }
+  @page { size: A4 portrait; margin: 6mm; }
   body { background: #fff; }
   body::before, body::after, #app, .toast, .dialog-backdrop, .splash, .fatal, .bottom-nav { display: none !important; }
   #print-root { display: block !important; }
+  .print-card { min-height: 0; border-radius: 14px; }
 }
 
 #print-root { display: none; }
@@ -833,38 +834,44 @@ tbody .folio { font-size: .78rem; }
   font-family: var(--font-body);
   color: #0B0B0B;
   text-align: center;
-  border: 2px solid #0B0B0B;
-  border-radius: 12px;
-  padding: 30px 26px;
-  max-width: 430px;
+  border: 4px solid #0B0B0B;
+  border-radius: 20px;
+  padding: 42px 30px;
+  min-height: calc(100vh - 56px);
+  width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
   background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
-.pc-logo { width: 74px; height: 74px; object-fit: contain; margin-bottom: 8px; }
+.pc-logo { width: 132px; height: 132px; object-fit: contain; margin-bottom: 10px; }
 .print-card h1 {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 2.6rem;
   letter-spacing: .02em;
   text-transform: uppercase;
   color: #0B0B0B;
   line-height: 1.05;
 }
-.pc-sub { font-size: .82rem; letter-spacing: .18em; text-transform: uppercase; color: var(--flame); font-weight: 700; margin-top: 4px; }
+.pc-sub { font-size: 1.05rem; letter-spacing: .18em; text-transform: uppercase; color: var(--flame); font-weight: 700; margin-top: 6px; }
 .pc-foto {
-  width: 108px;
-  height: 108px;
+  width: 200px;
+  height: 200px;
   object-fit: cover;
   border-radius: 50%;
-  border: 3px solid #0B0B0B;
-  margin: 14px auto 0;
+  border: 4px solid #0B0B0B;
+  margin: 22px auto 0;
   display: block;
   background: #eee;
 }
 .pc-foto-empty { display: none; }
-.pc-qr { width: 170px; height: 170px; margin: 18px auto 14px; display: block; }
-.pc-name { font-size: 1.15rem; font-weight: 800; }
-.pc-folio { font-family: var(--font-mono); font-size: 1rem; font-weight: 700; letter-spacing: .12em; margin-top: 6px; color: var(--flame); }
-.pc-note { font-size: .74rem; color: #6b6155; margin-top: 16px; padding-top: 12px; border-top: 1px dashed #b8ad9d; }
+.pc-qr { width: 300px; height: 300px; margin: 26px auto 20px; display: block; }
+.pc-name { font-size: 1.9rem; font-weight: 800; }
+.pc-folio { font-family: var(--font-mono); font-size: 1.7rem; font-weight: 700; letter-spacing: .14em; margin-top: 10px; color: var(--flame); }
+.pc-note { font-size: 1rem; color: #6b6155; margin-top: 22px; padding-top: 16px; border-top: 2px dashed #b8ad9d; }
 
 /* ------------------------------------------------------------ accesibilidad */
 @media (prefers-reduced-motion: reduce) {
