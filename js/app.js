@@ -56,9 +56,10 @@
   const fmtDiaLargo = iso => new Date(iso + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const makeQR = (text, size) => {
-    const div = document.createElement('div');
-    new QRCode(div, { text, width: size, height: size, colorDark: '#111111', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
-    return div.querySelector('canvas').toDataURL('image/png');
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    return qr.createDataURL(6, 2);
   };
 
   async function loadComidas() {
@@ -90,9 +91,12 @@
     state.view = 'login';
     app.innerHTML = `
       <div class="login">
+        <div class="sun-rays" aria-hidden="true"></div>
+        <div class="pyramids" aria-hidden="true"></div>
         <div class="login-brand">
           <img src="assets/Alebrijes Teotihuacan.png" alt="Alebrijes Teotihuacán">
-          <h2>Casa Club<br><span>Alebrijes Teotihuacán</span></h2>
+          <div class="eyebrow">Casa Club</div>
+          <h2>Alebrijes<br><span>Teotihuacán</span></h2>
           <p>Control del comedor</p>
         </div>
         <form class="login-card" id="login-form">
@@ -909,20 +913,44 @@
 
   // ---------------------------------------------------------------- init
 
-  (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) await enterApp(session);
-    else renderLogin();
+  const splash = $('#splash');
+  const hideSplash = () => {
+    if (!splash) return;
+    splash.classList.add('gone');
+    setTimeout(() => splash.remove(), 400);
+  };
 
-    supabase.auth.onAuthStateChange((ev, s) => {
-      if (ev === 'SIGNED_OUT') {
-        stopScanner();
-        state.user = null;
-        state.perfil = null;
-        renderLogin();
-      } else if (ev === 'SIGNED_IN' && s && !state.perfil) {
-        enterApp(s);
-      }
-    });
+  const showFatal = msg => {
+    const el = $('#fatal');
+    if (!el) return;
+    const m = $('#fatal-msg');
+    if (m) m.textContent = msg;
+    el.classList.remove('hidden');
+    hideSplash();
+  };
+
+  window.addEventListener('error', e => showFatal('Se produjo un error al cargar la aplicación. Revisa tu conexión e inténtalo de nuevo.'));
+  window.addEventListener('unhandledrejection', e => showFatal('Se produjo un error al cargar la aplicación. Revisa tu conexión e inténtalo de nuevo.'));
+
+  (async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) await enterApp(session);
+      else renderLogin();
+      hideSplash();
+
+      supabase.auth.onAuthStateChange((ev, s) => {
+        if (ev === 'SIGNED_OUT') {
+          stopScanner();
+          state.user = null;
+          state.perfil = null;
+          renderLogin();
+        } else if (ev === 'SIGNED_IN' && s && !state.perfil) {
+          enterApp(s);
+        }
+      });
+    } catch (err) {
+      showFatal(err && err.message ? err.message : 'Se produjo un error al cargar la aplicación. Revisa tu conexión e inténtalo de nuevo.');
+    }
   })();
 })();
