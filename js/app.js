@@ -266,9 +266,9 @@
     const txtAnt = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Subiendo…'; }
     try {
-      const dataUrl = await leerImagenReducida(file, 400);
+      const blob = await leerImagenReducida(file, 400);
       const ruta = `${state.perfil.id}.jpg`;
-      const { error: upErr } = await supabase.storage.from('fotos').upload(ruta, dataUrl, { contentType: 'image/jpeg', upsert: true });
+      const { error: upErr } = await supabase.storage.from('fotos').upload(ruta, blob, { contentType: 'image/jpeg', upsert: true });
       if (upErr) { toast('No se pudo subir la foto: ' + upErr.message); return; }
       const url = supabase.storage.from('fotos').getPublicUrl(ruta).data.publicUrl;
       const { error } = await supabase.rpc('actualizar_foto', { p_url: url });
@@ -296,7 +296,7 @@
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob')), 'image/jpeg', 0.85);
         };
         img.onerror = reject;
         img.src = reader.result;
@@ -406,24 +406,24 @@
         </div>
       </div>`;
 
-    let comidaSel = vigente ? vigente.nombre : (state.comidas[0] || {}).nombre;
+    state.mealSel = vigente ? vigente.nombre : (state.comidas[0] || {}).nombre;
 
     $('#meal-picker').addEventListener('click', e => {
       const btn = e.target.closest('.meal-btn');
       if (!btn) return;
-      comidaSel = btn.dataset.meal;
+      state.mealSel = btn.dataset.meal;
       document.querySelectorAll('.meal-btn').forEach(b => b.classList.toggle('active', b === btn));
     });
 
     $('#btn-camera').addEventListener('click', startScanner);
     $('#btn-manual').addEventListener('click', () => {
       const folio = $('#manual-folio').value.trim().toUpperCase();
-      if (folio) registrarScan(folio, comidaSel);
+      if (folio) registrarScan(folio);
     });
     $('#manual-folio').addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         const folio = e.target.value.trim().toUpperCase();
-        if (folio) registrarScan(folio, comidaSel);
+        if (folio) registrarScan(folio);
       }
     });
 
@@ -461,8 +461,9 @@
     }
   }
 
-  async function registrarScan(folio, comidaSel) {
+  async function registrarScan(folio) {
     if (state.scanLock) return;
+    const comidaSel = state.mealSel;
     if (!comidaSel) { mostrarResultado('err', 'No hay comidas activas', 'Configura horarios en el panel.'); return; }
     state.scanLock = true;
     try {
@@ -825,6 +826,7 @@
       const results = await Promise.all(updates.map(u => supabase.from('comidas_config').update(u).eq('nombre', u.nombre)));
       const err = results.find(r => r.error);
       if (err) { toast('Error al guardar: ' + err.error.message); return; }
+      await loadComidas();
       toast('Horarios guardados.');
     });
   }
