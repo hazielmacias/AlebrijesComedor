@@ -3,6 +3,8 @@
 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
 
+  const $ = sel => document.querySelector(sel);
+
   const state = {
     user: null,
     perfil: null,
@@ -91,8 +93,6 @@
     state.view = 'login';
     app.innerHTML = `
       <div class="login">
-        <div class="sun-rays" aria-hidden="true"></div>
-        <div class="pyramids" aria-hidden="true"></div>
         <div class="login-brand">
           <img src="assets/Alebrijes Teotihuacan.png" alt="Alebrijes Teotihuacán">
           <div class="eyebrow">Casa Club</div>

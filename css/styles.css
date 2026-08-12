@@ -43,29 +43,16 @@ body {
   overflow-x: hidden;
 }
 
-/* Fondo: brillo volcánico superior + silueta de pirámides abajo */
+/* Fondo: brillo naranja superior + inferior (colores del logo) */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   z-index: -2;
   background:
-    radial-gradient(120% 55% at 50% -8%, rgba(255, 107, 26, .16), transparent 62%),
-    radial-gradient(90% 40% at 50% 108%, rgba(255, 107, 26, .07), transparent 60%),
+    radial-gradient(120% 55% at 50% -8%, rgba(255, 107, 26, .14), transparent 62%),
+    radial-gradient(90% 40% at 50% 108%, rgba(255, 107, 26, .06), transparent 60%),
     var(--bg);
-}
-
-body::after {
-  content: '';
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
-  height: 46px;
-  z-index: -1;
-  opacity: .5;
-  background:
-    linear-gradient(63deg, transparent 38%, #241A10 39% 60%, transparent 61%) left / 58px 100% no-repeat,
-    linear-gradient(63deg, transparent 38%, #1E160D 39% 60%, transparent 61%) left / 44px 100% no-repeat,
-    linear-gradient(63deg, transparent 38%, #2A2116 39% 60%, transparent 61%) left / 34px 100% no-repeat;
 }
 
 ::selection { background: var(--flame); color: #171008; }
@@ -97,10 +84,15 @@ input, select { font-family: var(--font-body); }
   transition: opacity .35s ease;
 }
 .splash img {
-  width: 92px;
-  height: 92px;
+  width: 110px;
+  height: 110px;
   object-fit: contain;
-  filter: drop-shadow(0 0 22px rgba(255, 107, 26, .45));
+  filter: drop-shadow(0 0 22px rgba(255, 107, 26, .5));
+  animation: splash-breathe 1.6s ease-in-out infinite;
+}
+@keyframes splash-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
 }
 .splash-pulse {
   width: 46px;
@@ -352,42 +344,6 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
   padding: 34px 20px calc(40px + env(safe-area-inset-bottom));
   position: relative;
   overflow: hidden;
-}
-
-/* Sol de Teotihuacán: rayos girando detrás del emblema */
-.login .sun-rays {
-  position: absolute;
-  top: 2%;
-  left: 50%;
-  width: 78vmin;
-  height: 78vmin;
-  transform: translateX(-50%);
-  z-index: 0;
-  pointer-events: none;
-  background: repeating-conic-gradient(
-    from 0deg,
-    rgba(255, 107, 26, .16) 0deg 9deg,
-    transparent 9deg 22deg
-  );
-  -webkit-mask-image: radial-gradient(circle, transparent 26%, black 27% 46%, transparent 47%);
-  mask-image: radial-gradient(circle, transparent 26%, black 27% 46%, transparent 47%);
-  animation: spin 120s linear infinite;
-}
-@keyframes spin { to { transform: translateX(-50%) rotate(360deg); } }
-
-.login .pyramids {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 40%;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(63deg, transparent 42%, #221A12 43% 66%, transparent 67%) left / 150px 100% no-repeat,
-    linear-gradient(63deg, transparent 42%, #1E160D 43% 66%, transparent 67%) left / 110px 100% no-repeat,
-    linear-gradient(63deg, transparent 42%, #2A2116 43% 66%, transparent 67%) left / 80px 100% no-repeat;
-  opacity: .85;
 }
 
 .login-brand {
