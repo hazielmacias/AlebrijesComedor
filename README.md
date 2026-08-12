@@ -42,6 +42,7 @@ App web para registrar las comidas de los jugadores de la casa club mediante QR.
 | Administrador (respaldo) | `admin@alebrijes.club` | `Admin2026!` |
 | Cocinera | `cocinera@alebrijes.club` | `alebrijes2026` |
 | Jugador (prueba) | `jugador@alebrijes.club` | `Prueba123!` |
+| Jugador | `haziel@alebrijes.club` | `haziel09` |
 
 > Cambia las contraseñas apenas entres por primera vez. `Alebrijes2026!` quedó invalidada por la protección de contraseñas filtradas de Supabase.
 
