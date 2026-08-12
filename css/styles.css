@@ -225,6 +225,25 @@ input, select { font-family: var(--font-body); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.avatar {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+.avatar-sm { width: 26px; height: 26px; vertical-align: middle; margin-right: 6px; }
+.avatar-empty {
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+  font-size: .6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
 .name { font-family: var(--font-display); font-size: 1.35rem; letter-spacing: .03em; color: var(--bone); }
 
 /* ------------------------------------------------------------ badges / chips */
@@ -508,12 +527,33 @@ select {
   gap: 18px;
   padding: 6px 18px 18px;
 }
+.foto-box { flex-shrink: 0; }
+.foto {
+  width: 86px;
+  height: 86px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  display: block;
+}
+.foto-empty {
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
 .credencial-qr {
   background: #fff;
   border-radius: 10px;
   padding: 10px;
+  margin: 0 18px 14px;
   flex-shrink: 0;
   line-height: 0;
+  width: fit-content;
 }
 .credencial-qr img { display: block; width: 132px; height: 132px; }
 
@@ -810,6 +850,17 @@ tbody .folio { font-size: .78rem; }
   line-height: 1.05;
 }
 .pc-sub { font-size: .82rem; letter-spacing: .18em; text-transform: uppercase; color: var(--flame); font-weight: 700; margin-top: 4px; }
+.pc-foto {
+  width: 108px;
+  height: 108px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid #0B0B0B;
+  margin: 14px auto 0;
+  display: block;
+  background: #eee;
+}
+.pc-foto-empty { display: none; }
 .pc-qr { width: 170px; height: 170px; margin: 18px auto 14px; display: block; }
 .pc-name { font-size: 1.15rem; font-weight: 800; }
 .pc-folio { font-family: var(--font-mono); font-size: 1rem; font-weight: 700; letter-spacing: .12em; margin-top: 6px; color: var(--flame); }

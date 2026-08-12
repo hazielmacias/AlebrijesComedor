@@ -2,9 +2,9 @@
 
 App web para registrar las comidas de los jugadores de la casa club mediante QR.
 
-- **Jugadores:** inician sesión y ven su credencial con QR digital + tarjeta imprimible (PDF).
+- **Jugadores:** inician sesión y ven su credencial con QR digital, foto de perfil y tarjeta imprimible (PDF). Pueden subir/cambiar su foto desde su perfil.
 - **Cocineras:** escanean el QR con la cámara del celular para registrar Desayuno, Comida y Cena. Bloquea duplicados y registra faltas manuales.
-- **Administrador:** crea usuarios, configura horarios con tolerancia y ve el reporte de faltas (automáticas y manuales), pudiendo justificarlas.
+- **Administrador:** crea usuarios, configura horarios con tolerancia y ve el reporte de faltas (automáticas y manuales) con foto de cada jugador, pudiendo justificarlas.
 
 ## Stack
 
@@ -34,23 +34,26 @@ App web para registrar las comidas de los jugadores de la casa club mediante QR.
 
 > La app necesita HTTPS (GitHub Pages lo da) para que la cámara del celular funcione al escanear.
 
-## 3. Accesos iniciales (cámbialos apenas entres)
+## 3. Accesos actuales
 
 | Rol | Usuario | Contraseña |
 |---|---|---|
-| Administrador | `admin@alebrijes.club` | `Admin2026!` |
-| Cocinera (prueba) | `cocinera@alebrijes.club` | `Prueba123!` |
+| Administrador | `juan@alebrijes.club` | `alebrijes2026` |
+| Administrador (respaldo) | `admin@alebrijes.club` | `Admin2026!` |
+| Cocinera | `cocinera@alebrijes.club` | `alebrijes2026` |
 | Jugador (prueba) | `jugador@alebrijes.club` | `Prueba123!` |
+
+> Cambia las contraseñas apenas entres por primera vez. `Alebrijes2026!` quedó invalidada por la protección de contraseñas filtradas de Supabase.
 
 ## 4. Uso diario
 
 1. **El administrador** entra, va a *Panel → Jugadores* y crea a cada jugador (nombre, folio, usuario y contraseña).
-2. **El jugador** entra con su usuario, ve su credencial con QR y pulsa *Imprimir / Guardar PDF* para llevarla impresa.
+2. **El jugador** entra con su usuario, ve su credencial con QR y foto, pulsa *Subir foto de perfil* para agregarla y *Imprimir / Guardar PDF* para llevarla impresa (la foto aparece también en el PDF).
 3. **La cocinera** abre la app en su celular, pulsa *Escanear*, elige la comida (se preselecciona la del momento) y apunta la cámara al QR de cada jugador.
    - Dentro del horario (+ tolerancia): se registra la comida.
    - Fuera de horario: avisa y permite registrar falta manual.
    - QR repetido en la misma comida: avisa «ya registrado», no duplica.
-4. **El administrador** ve el *Reporte* de faltas por rango de fechas, las justifica con motivo, y puede corregir registros.
+4. **El administrador** ve el *Reporte* de faltas por rango de fechas (con foto de cada jugador), las justifica con motivo, y puede corregir registros.
 
 ## 5. Horarios por defecto
 

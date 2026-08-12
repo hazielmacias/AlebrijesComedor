@@ -216,7 +216,11 @@
             </div>
           </div>
           <div class="credencial-body">
-            <div class="credencial-qr"><img src="${qr}" alt="Código QR" width="150" height="150"></div>
+            <div class="foto-box">
+              ${p.foto_url
+                ? `<img class="foto" src="${esc(p.foto_url)}" alt="Foto de ${esc(p.nombre)}">`
+                : `<div class="foto foto-empty">Sin foto</div>`}
+            </div>
             <div class="credencial-info">
               <div class="name">${esc(p.nombre)}</div>
               <div class="rol-tag">Jugador</div>
@@ -224,12 +228,15 @@
               <div class="folio">${esc(p.folio)}</div>
             </div>
           </div>
+          <div class="credencial-qr"><img src="${qr}" alt="Código QR" width="150" height="150"></div>
           <div class="credencial-foot">
             <span>Escanea tu QR al pasar al comedor</span>
             <span class="seal">● ${new Date().getFullYear()}</span>
           </div>
         </div>
-        <button class="btn btn-primary btn-block" id="btn-print">Imprimir / Guardar PDF</button>
+        <button class="btn btn-ghost btn-block" id="btn-foto">${p.foto_url ? 'Cambiar foto de perfil' : 'Subir foto de perfil'}</button>
+        <input type="file" id="input-foto" accept="image/*" hidden>
+        <button class="btn btn-primary btn-block" id="btn-print" style="margin-top:10px">Imprimir / Guardar PDF</button>
         <div class="card">
           <div class="card-title">Horarios del comedor</div>
           <div class="list">
@@ -245,7 +252,58 @@
         </div>
       </div>`;
 
+    $('#btn-foto').addEventListener('click', () => $('#input-foto').click());
+    $('#input-foto').addEventListener('change', e => {
+      const file = e.target.files && e.target.files[0];
+      if (file) subirFoto(file);
+    });
     $('#btn-print').addEventListener('click', () => printCredencial(p, qr));
+  }
+
+  async function subirFoto(file) {
+    if (!file.type.startsWith('image/')) { toast('Elige un archivo de imagen.'); return; }
+    const btn = $('#btn-foto');
+    const txtAnt = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Subiendo…'; }
+    try {
+      const dataUrl = await leerImagenReducida(file, 400);
+      const ruta = `${state.perfil.id}.jpg`;
+      const { error: upErr } = await supabase.storage.from('fotos').upload(ruta, dataUrl, { contentType: 'image/jpeg', upsert: true });
+      if (upErr) { toast('No se pudo subir la foto: ' + upErr.message); return; }
+      const url = supabase.storage.from('fotos').getPublicUrl(ruta).data.publicUrl;
+      const { error } = await supabase.rpc('actualizar_foto', { p_url: url });
+      if (error) { toast(error.message); return; }
+      state.perfil.foto_url = url;
+      toast('Foto actualizada.');
+      renderCredencial($('#main'));
+    } catch (err) {
+      toast('No se pudo procesar la imagen.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = txtAnt; }
+    }
+  }
+
+  function leerImagenReducida(file, maxDim) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const escala = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.round(img.width * escala);
+          const h = Math.round(img.height * escala);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   function printCredencial(p, qr) {
@@ -254,6 +312,7 @@
         <img class="pc-logo" src="assets/Alebrijes Teotihuacan.png" alt="">
         <h1>CASA CLUB ALEBRIJES TEOTIHUACÁN</h1>
         <p class="pc-sub">Credencial de acceso al comedor</p>
+        ${p.foto_url ? `<img class="pc-foto" src="${esc(p.foto_url)}" alt="Foto">` : '<div class="pc-foto pc-foto-empty"></div>'}
         <img class="pc-qr" src="${qr}" alt="QR">
         <p class="pc-name">${esc(p.nombre)}</p>
         <p class="pc-folio">FOLIO ${esc(p.folio)}</p>
@@ -503,7 +562,7 @@
     const countEl = $('#today-count');
     if (!box) return;
     const { data } = await supabase.from('asistencias')
-      .select('id, comida, hora, perfil:perfiles(folio, nombre)')
+      .select('id, comida, hora, perfil:perfiles!asistencias_perfil_id_fkey(folio, nombre)')
       .eq('dia', todayLocal())
       .order('hora', { ascending: false });
     if (countEl) countEl.textContent = String(data?.length || 0);
@@ -538,10 +597,10 @@
 
     const [asis, faltas] = await Promise.all([
       supabase.from('asistencias')
-        .select('id, comida, hora, perfil:perfiles(folio, nombre)')
+        .select('id, comida, hora, perfil:perfiles!asistencias_perfil_id_fkey(folio, nombre)')
         .eq('dia', todayLocal()).order('hora', { ascending: false }),
       supabase.from('faltas')
-        .select('id, comida, tipo, nota, perfil:perfiles(folio, nombre)')
+        .select('id, comida, tipo, nota, perfil:perfiles!faltas_perfil_id_fkey(folio, nombre)')
         .eq('dia', todayLocal()).order('creado_en', { ascending: false }),
     ]);
 
@@ -693,6 +752,7 @@
     const etiquetaRol = { administrador: 'Admin', cocinera: 'Cocinera', jugador: 'Jugador' }[p.rol];
     return `
       <div class="list-row">
+        ${p.foto_url ? `<img class="avatar" src="${esc(p.foto_url)}" alt="">` : '<div class="avatar avatar-empty"></div>'}
         <div class="row-main">
           <div class="row-name">${esc(p.nombre)}</div>
           <div class="row-sub"><span class="folio">${esc(p.folio)}</span> · ${etiquetaRol}</div>
@@ -793,10 +853,10 @@
     const [auto, manual, asis] = await Promise.all([
       supabase.rpc('faltas_automaticas', { p_desde: desde, p_hasta: hasta }),
       supabase.from('faltas')
-        .select('id, perfil_id, comida, dia, tipo, nota, perfil:perfiles(folio, nombre)')
+        .select('id, perfil_id, comida, dia, tipo, nota, perfil:perfiles!faltas_perfil_id_fkey(folio, nombre, foto_url)')
         .gte('dia', desde).lte('dia', hasta).order('dia', { ascending: true }),
       supabase.from('asistencias')
-        .select('id, perfil_id, comida, dia, hora, perfil:perfiles(folio, nombre)')
+        .select('id, perfil_id, comida, dia, hora, perfil:perfiles!asistencias_perfil_id_fkey(folio, nombre, foto_url)')
         .gte('dia', desde).lte('dia', hasta).order('dia', { ascending: true }).order('hora', { ascending: true }),
     ]);
 
@@ -804,18 +864,18 @@
     const porClave = {};
     manuales.forEach(m => {
       const k = `${m.perfil_id}|${m.comida}|${m.dia}`;
-      porClave[k] = { perfil_id: m.perfil_id, comida: m.comida, dia: m.dia, id: m.id, tipo: m.tipo, nota: m.nota, folio: m.perfil?.folio, nombre: m.perfil?.nombre };
+      porClave[k] = { perfil_id: m.perfil_id, comida: m.comida, dia: m.dia, id: m.id, tipo: m.tipo, nota: m.nota, folio: m.perfil?.folio, nombre: m.perfil?.nombre, foto_url: m.perfil?.foto_url };
     });
 
     const filas = [];
     (auto.data || []).forEach(f => {
       const k = `${f.perfil_id}|${f.comida}|${f.dia}`;
       if (!porClave[k]) {
-        filas.push({ perfil_id: f.perfil_id, folio: f.folio, nombre: f.nombre, comida: f.comida, dia: f.dia, tipo: 'automática', nota: '', id: null });
+        filas.push({ perfil_id: f.perfil_id, folio: f.folio, nombre: f.nombre, comida: f.comida, dia: f.dia, tipo: 'automática', nota: '', id: null, foto_url: f.foto_url });
       }
     });
     Object.values(porClave).forEach(m => filas.push({
-      perfil_id: m.perfil_id, folio: m.folio, nombre: m.nombre, comida: m.comida, dia: m.dia, tipo: m.tipo, nota: m.nota, id: m.id,
+      perfil_id: m.perfil_id, folio: m.folio, nombre: m.nombre, comida: m.comida, dia: m.dia, tipo: m.tipo, nota: m.nota, id: m.id, foto_url: m.foto_url,
     }));
     filas.sort((a, b) => a.dia.localeCompare(b.dia) || a.nombre.localeCompare(b.nombre));
 
@@ -830,6 +890,7 @@
           : `<div class="list">
               ${filas.map(f => `
                 <div class="list-row">
+                  ${f.foto_url ? `<img class="avatar" src="${esc(f.foto_url)}" alt="">` : '<div class="avatar avatar-empty"></div>'}
                   <div class="row-main">
                     <div class="row-name">${esc(f.nombre || '—')}</div>
                     <div class="row-sub"><span class="folio">${esc(f.folio || '—')}</span> · ${esc(fmtDiaLargo(f.dia))} · ${esc(etiqueta(f.comida))}</div>
@@ -854,7 +915,7 @@
                 ${asisList.map(a => `
                   <tr>
                     <td>${esc(fmtDia(a.dia))}</td>
-                    <td>${esc(a.perfil?.nombre || '—')} <span class="folio">${esc(a.perfil?.folio || '')}</span></td>
+                    <td>${a.perfil?.foto_url ? `<img class="avatar avatar-sm" src="${esc(a.perfil.foto_url)}" alt="">` : ''}${esc(a.perfil?.nombre || '—')} <span class="folio">${esc(a.perfil?.folio || '')}</span></td>
                     <td>${esc(etiqueta(a.comida))}</td>
                     <td class="chip">${fmtDT(a.hora)}</td>
                     <td><button class="btn-icon" data-del="${a.id}" title="Eliminar registro">✕</button></td>
