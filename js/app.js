@@ -50,7 +50,7 @@
     const qr = qrcode(0, 'M');
     qr.addData(text);
     qr.make();
-    return qr.createDataURL(6, 2);
+    return qr.createDataURL(8, 2);
   };
 
   const icon = (path) =>
@@ -59,6 +59,7 @@
   const NAV = {
     jugador: [
       { id: 'credencial', label: 'Credencial', icon: 'M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm2 3h12v2H6V7Zm0 4h8v2H6v-2Zm0 4h5v2H6v-2Z' },
+      { id: 'escaneo', label: 'Escanear', icon: 'M3 7V4a1 1 0 0 1 1-1h3m10 0h3a1 1 0 0 1 1 1v3m0 10v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3m5-9v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2Zm2 8h6' },
       { id: 'misdatos', label: 'Mis comidas', icon: 'M12 3a9 9 0 1 0 9 9h-9V3Zm0 0v9h9A9 9 0 0 0 12 3Z' },
     ],
     cocinera: [
@@ -398,61 +399,89 @@
   async function startScanner() {
     const frame = $('#scanner-frame');
     if (!frame) return;
-    frame.innerHTML = '<div class="scanner-off">Iniciando cámara…</div>';
     if (typeof Html5Qrcode === 'undefined') {
       frame.innerHTML = '<div class="scanner-off"><p>Este navegador no soporta el escáner. Escribe el folio a mano.</p></div>';
       return;
     }
+
+    const configs = [{ facingMode: 'environment' }, { facingMode: 'user' }];
     try {
-      state.scanner = new Html5Qrcode('scanner-frame');
-      await state.scanner.start(
-        { facingMode: 'environment' },
-        { fps: 8, qrbox: { width: 230, height: 230 } },
-        text => registrarScan(String(text).trim().toUpperCase()),
-        () => {}
-      );
-    } catch (err) {
-      frame.innerHTML = `
-        <div class="scanner-off">
-          <p>No se pudo acceder a la cámara (${esc(err.name || 'error')}).</p>
-          <p class="chip">Escribe el folio a mano en el campo de abajo.</p>
-        </div>`;
+      const cams = await Html5Qrcode.getCameras();
+      (cams || []).forEach(c => configs.push({ deviceId: { exact: c.id } }));
+    } catch {}
+
+    let ultimoError = 'No se pudo acceder a la cámara';
+    for (const cfg of configs) {
+      if (state.scanner) { try { state.scanner.stop().catch(() => {}); } catch {} state.scanner = null; }
+      frame.innerHTML = '<div class="scanner-off"><p>Iniciando cámara…</p></div>';
+      try {
+        state.scanner = new Html5Qrcode('scanner-frame');
+        await state.scanner.start(cfg, { fps: 8, qrbox: { width: 230, height: 230 } }, text => {
+          registrarScan(String(text).trim().toUpperCase()).then(ok => { if (ok) stopScanner(); });
+        }, () => {});
+        return;
+      } catch (err) {
+        ultimoError = err && err.name ? err.name : String(err && err.message || '');
+      }
     }
+
+    frame.innerHTML = `
+      <div class="scanner-off">
+        <p>No se pudo acceder a la cámara (${esc(ultimoError)}).</p>
+        <p class="chip">Escribe el folio a mano en el campo de abajo.</p>
+      </div>`;
   }
 
   function stopScanner() {
     if (state.scanner) {
-      try { state.scanner.stop().then(() => state.scanner = null).catch(() => state.scanner = null); } catch { state.scanner = null; }
+      try {
+        state.scanner.stop().then(() => {
+          state.scanner = null;
+          restaurarBotonesCamara();
+        }).catch(() => { state.scanner = null; });
+      } catch { state.scanner = null; }
     }
   }
 
+  function restaurarBotonesCamara() {
+    const frame = $('#scanner-frame');
+    if (!frame) return;
+    frame.innerHTML = `
+      <div class="scanner-off">
+        <p>Pulsa para encender la cámara</p>
+        <button class="btn btn-primary" id="btn-camera">Encender cámara</button>
+      </div>`;
+    const b = $('#btn-camera');
+    if (b) b.addEventListener('click', startScanner);
+  }
+
   async function registrarScan(folio) {
-    if (state.scanLock) return;
+    if (state.scanLock) return false;
     const comidaSel = state.mealSel || 'desayuno';
     state.scanLock = true;
     try {
       const { data: perfil } = await supabase.from('perfiles').select('*').eq('folio', folio).maybeSingle();
       if (!perfil) {
         mostrarResultado('err', `Folio ${esc(folio)} no encontrado`, 'Verifica que la credencial sea de este club.');
-        return;
+        return false;
       }
       if (perfil.rol !== 'jugador') {
         mostrarResultado('err', `${esc(perfil.nombre)} no es jugador`, 'Solo las credenciales de jugador se registran en el comedor.');
-        return;
+        return false;
       }
       if (!perfil.activo) {
         mostrarResultado('err', `${esc(perfil.nombre)} está bloqueado`, 'Hable con el administrador para reactivar su cuenta.');
-        return;
+        return false;
       }
 
       const { data: dup } = await supabase.from('asistencias').select('id, hora')
         .eq('perfil_id', perfil.id).eq('comida', comidaSel).eq('dia', todayLocal()).maybeSingle();
       if (dup) {
         mostrarResultado('warn', `${esc(perfil.nombre)} ya está registrado`, `En ${etiqueta(comidaSel)} a las ${fmtDT(dup.hora)}. No se duplica.`);
-        return;
+        return false;
       }
 
-      await registrarAsistencia(perfil, comidaSel);
+      return await registrarAsistencia(perfil, comidaSel);
     } finally {
       setTimeout(() => state.scanLock = false, 1500);
     }
@@ -471,10 +500,11 @@
       } else {
         mostrarResultado('err', 'No se pudo registrar', error.message);
       }
-      return;
+      return false;
     }
     mostrarResultado('ok', `${esc(perfil.nombre)} registrado`, `${etiqueta(comidaSel)} a las ${fmtDT(new Date().toISOString())}.`);
     cargarHoy();
+    return true;
   }
 
   function mostrarResultado(tipo, titulo, sub, acciones) {
