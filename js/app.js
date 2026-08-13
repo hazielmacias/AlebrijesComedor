@@ -374,6 +374,10 @@
               <button class="btn btn-primary" id="btn-camera">Encender cámara</button>
             </div>
           </div>
+          <div class="cam-picker">
+            <button class="cam-btn ${state.camFacing === 'user' ? '' : 'active'}" data-facing="environment">Cámara trasera</button>
+            <button class="cam-btn ${state.camFacing === 'user' ? 'active' : ''}" data-facing="user">Cámara frontal (selfie)</button>
+          </div>
         </div>
 
         <div class="manual-input">
@@ -394,6 +398,7 @@
       </div>`;
 
     state.mealSel = state.mealSel || 'desayuno';
+    state.camFacing = localStorage.getItem('camaraPreferida') || 'environment';
 
     $('#meal-picker').addEventListener('click', e => {
       const btn = e.target.closest('.meal-btn');
@@ -403,6 +408,12 @@
     });
 
     $('#btn-camera').addEventListener('click', startScanner);
+    document.querySelectorAll('.cam-btn').forEach(b => b.addEventListener('click', () => {
+      state.camFacing = b.dataset.facing;
+      localStorage.setItem('camaraPreferida', state.camFacing);
+      document.querySelectorAll('.cam-btn').forEach(x => x.classList.toggle('active', x === b));
+      startScanner();
+    }));
     $('#btn-manual').addEventListener('click', () => {
       const folio = $('#manual-folio').value.trim().toUpperCase();
       if (folio) registrarScan(folio);
@@ -425,6 +436,11 @@
       }
       mostrarResultado('ok', 'Leyendo el QR de la foto…', 'Sostén firme y deja que el código quede completo y enfocado.');
       try {
+        if (state.scanner) {
+          try { await state.scanner.stop().catch(() => {}); } catch {}
+          state.scanner = null;
+          restaurarBotonesCamara();
+        }
         const scan = new Html5Qrcode('scan-file-target');
         const texto = await scan.scanFile(file, false);
         registrarScan(String(texto).trim().toUpperCase());
@@ -444,24 +460,26 @@
       return;
     }
 
+    const preferida = state.camFacing || 'environment';
     const configs = [
-      { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      { facingMode: preferida, width: { ideal: 1280 }, height: { ideal: 720 } },
+      { facingMode: preferida },
     ];
     try {
       const cams = await Promise.race([
         Html5Qrcode.getCameras(),
         new Promise(r => setTimeout(() => r(null), 1500)),
       ]);
-      (cams || []).forEach(c => configs.push({ deviceId: { exact: c.id } }));
+      if (cams && cams.length) {
+        const esFrontal = c => /front|selfie|frontal/i.test(c.label || '');
+        cams.sort((a, b) => (preferida === 'user' ? esFrontal(b) - esFrontal(a) : esFrontal(a) - esFrontal(b)));
+        cams.forEach(c => configs.push({ deviceId: { exact: c.id } }));
+      }
     } catch {}
     configs.push({ facingMode: 'environment' }, { facingMode: 'user' });
 
     let ultimoError = 'No se pudo acceder a la cámara';
-    try {
-      const cams = await Html5Qrcode.getCameras();
-      (cams || []).forEach(c => configs.push({ deviceId: { exact: c.id } }));
-    } catch {}
+    let framesSinDecodificar = 0;
 
     for (const cfg of configs) {
       if (state.scanner) { try { state.scanner.stop().catch(() => {}); } catch {} state.scanner = null; }
@@ -470,10 +488,16 @@
         state.scanner = new Html5Qrcode('scanner-frame');
         await state.scanner.start(cfg, {
           fps: 8,
-          qrbox: (vw, vh) => ({ width: Math.floor(vw * 0.7), height: Math.floor(vh * 0.7) }),
         }, text => {
-          registrarScan(String(text).trim().toUpperCase()).then(ok => { if (ok) stopScanner(); });
-        }, () => {});
+          const folio = String(text).trim().toUpperCase();
+          stopScanner();
+          registrarScan(folio);
+        }, () => {
+          framesSinDecodificar++;
+          if (framesSinDecodificar === 12) {
+            mostrarResultado('err', 'Escaneando…', 'Acerca el QR a la cámara, mantenlo quieto y con buena luz.');
+          }
+        });
         return;
       } catch (err) {
         ultimoError = err && err.name ? err.name : String(err && err.message || '');
