@@ -2,9 +2,9 @@
 
 App web para registrar las comidas de los jugadores de la casa club mediante QR.
 
-- **Jugadores:** inician sesión y ven su credencial con QR digital, foto de perfil y tarjeta imprimible (PDF) a pantalla completa. Pueden subir/cambiar su foto desde su perfil.
+- **Jugadores:** inician sesión y ven su credencial con QR digital, foto de perfil y tarjeta imprimible (PDF, centrada en la hoja). Pueden subir/cambiar su foto desde su perfil. **No escanean.**
 - **Cocineras:** eligen la comida (Desayuno, Comida o Cena — el horario lo decide su celular) y escanean el QR con la cámara. Bloquea duplicados.
-- **Administrador:** crea usuarios y ve el reporte de faltas automáticas (el jugador que no se registró en la comida del día no pasó al comedor) con foto de cada jugador.
+- **Administrador:** el panel muestra **solo quién no pasó al comedor** y a qué comida faltó, por día, con filtro de fechas; además crea usuarios.
 
 ## Stack
 
@@ -50,10 +50,10 @@ App web para registrar las comidas de los jugadores de la casa club mediante QR.
 
 1. **El administrador** entra, va a *Panel → Jugadores* y crea a cada jugador (nombre, folio de 4 dígitos, usuario y contraseña).
 2. **El jugador** entra con su usuario, ve su credencial con QR y foto, pulsa *Subir foto de perfil* para agregarla y *Imprimir / Guardar PDF* para llevarla impresa (la foto aparece también en el PDF).
-3. **La cocinera** abre la app en su celular, pulsa *Escanear*, elige la comida que está sirviendo (Desayuno, Comida o Cena) y apunta la cámara al QR de cada jugador.
+3. **La cocinera** (o el administrador) abre la app, pulsa *Escanear*, elige la comida que está sirviendo (Desayuno, Comida o Cena) y apunta la cámara al QR de cada jugador.
    - El QR del jugador se registra al momento; si ya estaba registrado en esa comida, avisa «ya registrado» y no duplica.
-   - Las faltas son automáticas: el jugador que **no se registró** en una comida del día queda como falta en el reporte.
-4. **El administrador** ve el *Reporte* de faltas automáticas por rango de fechas (con foto de cada jugador) y puede corregir registros.
+   - Las faltas son automáticas: el jugador que **no se registró** en una comida del día queda como falta en el panel.
+4. **El administrador** ve en *Panel → Faltas* quién no pasó al comedor y a qué comida faltó, por día, con filtro de fechas (Desde/Hasta, por defecto hoy).
 
 ## 5. Folios
 

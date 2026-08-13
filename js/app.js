@@ -9,7 +9,7 @@
     user: null,
     perfil: null,
     view: 'login',
-    adminTab: 'jugadores',
+    adminTab: 'faltas',
     scanner: null,
     scanLock: false,
   };
@@ -59,7 +59,6 @@
   const NAV = {
     jugador: [
       { id: 'credencial', label: 'Credencial', icon: 'M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm2 3h12v2H6V7Zm0 4h8v2H6v-2Zm0 4h5v2H6v-2Z' },
-      { id: 'escaneo', label: 'Escanear', icon: 'M3 7V4a1 1 0 0 1 1-1h3m10 0h3a1 1 0 0 1 1 1v3m0 10v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3m5-9v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2Zm2 8h6' },
       { id: 'misdatos', label: 'Mis comidas', icon: 'M12 3a9 9 0 1 0 9 9h-9V3Zm0 0v9h9A9 9 0 0 0 12 3Z' },
     ],
     cocinera: [
@@ -601,9 +600,9 @@
       <div class="view">
         <div class="view-title">Panel de administración</div>
         <div class="tabs">
-          ${['jugadores', 'reporte'].map(t =>
+          ${['faltas', 'jugadores'].map(t =>
             `<button class="tab-btn ${state.adminTab === t ? 'active' : ''}" data-tab="${t}">${
-              t === 'jugadores' ? 'Jugadores' : 'Reporte'}</button>`).join('')}
+              t === 'faltas' ? 'Faltas' : 'Jugadores'}</button>`).join('')}
         </div>
         <div id="admin-body"></div>
       </div>`;
@@ -614,8 +613,8 @@
     }));
 
     const body = $('#admin-body');
-    if (state.adminTab === 'jugadores') renderAdminJugadores(body);
-    else renderAdminReporte(body);
+    if (state.adminTab === 'faltas') renderAdminFaltas(body);
+    else renderAdminJugadores(body);
   }
 
   async function renderAdminJugadores(body) {
@@ -737,82 +736,72 @@
     }));
   }
 
-  async function renderAdminReporte(body) {
-    body.innerHTML = '<div class="empty">Cargando…</div>';
+  async function renderAdminFaltas(body) {
     const hoy = todayLocal();
     body.innerHTML = `
       <div class="card">
-        <div class="card-title">Reporte de faltas</div>
+        <div class="card-title">¿Quién no pasó al comedor?</div>
         <div class="form-row" style="margin-bottom:12px">
-          <div class="field"><label>Desde</label><input type="date" id="r-desde" value="${addDays(hoy, -6)}"></div>
-          <div class="field"><label>Hasta</label><input type="date" id="r-hasta" value="${hoy}"></div>
+          <div class="field"><label>Desde</label><input type="date" id="f-desde" value="${hoy}"></div>
+          <div class="field"><label>Hasta</label><input type="date" id="f-hasta" value="${hoy}"></div>
         </div>
-        <button class="btn btn-primary btn-block" id="r-ver">Generar reporte</button>
+        <button class="btn btn-primary btn-block" id="f-ver">Ver días</button>
       </div>
-      <div id="r-resultado"></div>`;
+      <div id="f-resultado"></div>`;
 
-    $('#r-ver').addEventListener('click', () => generarReporte($('#r-desde').value, $('#r-hasta').value, $('#r-resultado')));
+    $('#f-ver').addEventListener('click', () => cargarFaltas($('#f-desde').value, $('#f-hasta').value, $('#f-resultado')));
+    cargarFaltas(hoy, hoy, $('#f-resultado'));
   }
 
-  async function generarReporte(desde, hasta, box) {
+  async function cargarFaltas(desde, hasta, box) {
     if (!desde || !hasta || desde > hasta) { toast('Rango de fechas inválido.'); return; }
-    box.innerHTML = '<div class="empty">Generando reporte…</div>';
+    box.innerHTML = '<div class="empty">Consultando…</div>';
 
-    const [faltas, asis] = await Promise.all([
-      supabase.rpc('faltas_automaticas', { p_desde: desde, p_hasta: hasta }),
-      supabase.from('asistencias')
-        .select('id, perfil_id, comida, dia, hora, perfil:perfiles!asistencias_perfil_id_fkey(folio, nombre, foto_url)')
-        .gte('dia', desde).lte('dia', hasta).order('dia', { ascending: true }).order('hora', { ascending: true }),
-    ]);
+    const { data } = await supabase.rpc('faltas_automaticas', { p_desde: desde, p_hasta: hasta });
+    const filas = data || [];
 
-    const filas = faltas.data || [];
-    filas.sort((a, b) => a.dia.localeCompare(b.dia) || a.nombre.localeCompare(b.nombre));
+    const porDia = new Map();
+    filas.forEach(f => {
+      if (!porDia.has(f.dia)) porDia.set(f.dia, new Map());
+      const jug = porDia.get(f.dia);
+      if (!jug.has(f.perfil_id)) {
+        jug.set(f.perfil_id, { folio: f.folio, nombre: f.nombre, foto_url: f.foto_url, comidas: [] });
+      }
+      jug.get(f.perfil_id).comidas.push(f.comida);
+    });
 
-    const asisList = asis.data || [];
-    const sinFaltas = filas.length === 0;
+    const dias = [...porDia.keys()].sort().reverse();
+    let totalSinPasar = 0;
+    dias.forEach(d => totalSinPasar += porDia.get(d).size);
+
+    if (dias.length === 0) {
+      box.innerHTML = '<div class="card"><div class="empty">¡Todos pasaron al comedor en esos días!</div></div>';
+      return;
+    }
 
     box.innerHTML = `
-      <div class="card">
-        <div class="card-title"><span>Faltas (${filas.length})</span><span class="small">${desde} → ${hasta}</span></div>
-        ${sinFaltas
-          ? '<div class="empty">Sin faltas en el periodo. ¡Buen trabajo!</div>'
-          : `<div class="list">
-              ${filas.map(f => `
-                <div class="list-row">
-                  ${f.foto_url ? `<img class="avatar" src="${esc(f.foto_url)}" alt="">` : '<div class="avatar avatar-empty"></div>'}
-                  <div class="row-main">
-                    <div class="row-name">${esc(f.nombre || '—')}</div>
-                    <div class="row-sub"><span class="folio">${esc(f.folio || '—')}</span> · ${esc(fmtDiaLargo(f.dia))} · ${esc(etiqueta(f.comida))}</div>
-                  </div>
-                  <span class="badge badge-bad">Falta</span>
-                </div>`).join('')}
-            </div>`}
+      <div class="stats">
+        <div class="stat"><div class="n bad">${totalSinPasar}</div><div class="l">Sin pasar</div></div>
+        <div class="stat"><div class="n">${dias.length}</div><div class="l">Días</div></div>
       </div>
-
-      <div class="card">
-        <div class="card-title"><span>Asistencias (${asisList.length})</span></div>
-        ${asisList.length === 0
-          ? '<div class="empty">Sin asistencias en el periodo.</div>'
-          : `<div class="table-wrap"><table>
-              <thead><tr><th>Día</th><th>Jugador</th><th>Comida</th><th>Hora</th><th></th></tr></thead>
-              <tbody>
-                ${asisList.map(a => `
-                  <tr>
-                    <td>${esc(fmtDia(a.dia))}</td>
-                    <td>${a.perfil?.foto_url ? `<img class="avatar avatar-sm" src="${esc(a.perfil.foto_url)}" alt="">` : ''}${esc(a.perfil?.nombre || '—')} <span class="folio">${esc(a.perfil?.folio || '')}</span></td>
-                    <td>${esc(etiqueta(a.comida))}</td>
-                    <td class="chip">${fmtDT(a.hora)}</td>
-                    <td><button class="btn-icon" data-del="${a.id}" title="Eliminar registro">✕</button></td>
-                  </tr>`).join('')}
-              </tbody>
-            </table></div>`}
-      </div>`;
-
-    box.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
-      await supabase.from('asistencias').delete().eq('id', b.dataset.del);
-      toast('Registro eliminado.');
-      generarReporte(desde, hasta, box);
-    }));
+      ${dias.map(dia => {
+        const jugs = [...porDia.get(dia).values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+        return `
+        <div class="card">
+          <div class="card-title"><span>${esc(fmtDiaLargo(dia))}</span><span class="badge badge-bad">${jugs.length} sin pasar</span></div>
+          <div class="list">
+            ${jugs.map(j => `
+              <div class="list-row">
+                ${j.foto_url ? `<img class="avatar" src="${esc(j.foto_url)}" alt="">` : '<div class="avatar avatar-empty"></div>'}
+                <div class="row-main">
+                  <div class="row-name">${esc(j.nombre)}</div>
+                  <div class="row-sub"><span class="folio">${esc(j.folio)}</span> · no pasó a: ${j.comidas.map(c => esc(etiqueta(c))).join(', ')}</div>
+                </div>
+                <span class="badge badge-bad">Falta</span>
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}`;
   }
 
   // ---------------------------------------------------------------- diálogo
