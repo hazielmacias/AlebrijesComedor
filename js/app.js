@@ -53,6 +53,13 @@
     return qr.createDataURL(8, 2);
   };
 
+  const makeQRGrande = text => {
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    return qr.createDataURL(18, 4);
+  };
+
   const icon = (path) =>
     `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
 
@@ -220,7 +227,18 @@
         <button class="btn btn-ghost btn-block" id="btn-foto">${p.foto_url ? 'Cambiar foto de perfil' : 'Subir foto de perfil'}</button>
         <input type="file" id="input-foto" accept="image/*" hidden>
         <button class="btn btn-primary btn-block" id="btn-print" style="margin-top:10px">Imprimir / Guardar PDF</button>
+        <button class="btn btn-ghost btn-block" id="btn-qr-full" style="margin-top:8px">Ver QR en pantalla completa</button>
       </div>`;
+
+    $('#btn-qr-full').addEventListener('click', () => {
+      abrirDialogo(`
+        <div class="qr-full">
+          <img src="${makeQRGrande(p.folio)}" alt="Código QR">
+          <p class="pc-name">${esc(p.nombre)}</p>
+          <p class="pc-folio">FOLIO ${esc(p.folio)}</p>
+          <p class="qr-full-hint">Apunta la cámara del comedor a este código.</p>
+        </div>`);
+    });
 
     $('#btn-foto').addEventListener('click', () => $('#input-foto').click());
     $('#input-foto').addEventListener('change', e => {
@@ -363,6 +381,10 @@
           <button class="btn btn-ghost" id="btn-manual">Buscar</button>
         </div>
 
+        <button class="btn btn-ghost btn-block" id="btn-qr-foto" style="margin-bottom:14px">Escanear con foto</button>
+        <input type="file" id="input-qr-foto" accept="image/*" capture="environment" hidden>
+        <div id="scan-file-target" hidden></div>
+
         <div id="scan-result"></div>
 
         <div class="card">
@@ -392,6 +414,25 @@
       }
     });
 
+    $('#btn-qr-foto').addEventListener('click', () => $('#input-qr-foto').click());
+    $('#input-qr-foto').addEventListener('change', async e => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      if (typeof Html5Qrcode === 'undefined') {
+        mostrarResultado('err', 'Este navegador no soporta el escáner de foto', 'Escribe el folio a mano.');
+        return;
+      }
+      mostrarResultado('ok', 'Leyendo el QR de la foto…', 'Sostén firme y deja que el código quede completo y enfocado.');
+      try {
+        const scan = new Html5Qrcode('scan-file-target');
+        const texto = await scan.scanFile(file, false);
+        registrarScan(String(texto).trim().toUpperCase());
+      } catch {
+        mostrarResultado('err', 'No se pudo leer el QR de la foto', 'Aleja un poco la cámara: el QR debe verse completo, nítido y sin reflejos.');
+      }
+    });
+
     cargarHoy();
   }
 
@@ -414,6 +455,7 @@
       ]);
       (cams || []).forEach(c => configs.push({ deviceId: { exact: c.id } }));
     } catch {}
+    configs.push({ facingMode: 'environment' }, { facingMode: 'user' });
 
     let ultimoError = 'No se pudo acceder a la cámara';
     try {
