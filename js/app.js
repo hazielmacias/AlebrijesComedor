@@ -705,13 +705,28 @@
     const jugadores = (perfiles || []).filter(p => p.rol === 'jugador');
     const personal = (perfiles || []).filter(p => p.rol !== 'jugador');
 
+    const usados = new Set((perfiles || []).map(p => p.folio));
+    const nuevoFolio = () => {
+      let f;
+      do { f = String(Math.floor(1000 + Math.random() * 9000)); } while (usados.has(f));
+      usados.add(f);
+      return f;
+    };
+    const folioInicial = nuevoFolio();
+
     body.innerHTML = `
       <div class="card">
         <div class="card-title">Crear usuario</div>
         <form class="form" id="form-crear">
           <div class="form-row">
             <div class="field"><label>Nombre completo</label><input id="c-nombre" required placeholder="Ej. Juan Pérez"></div>
-            <div class="field"><label>Folio (4 dígitos)</label><input id="c-folio" required placeholder="Ej. 0012" maxlength="4" pattern="\d{4}" inputmode="numeric" title="Solo 4 números"></div>
+            <div class="field">
+              <label>Folio (4 dígitos, ya generado)</label>
+              <div class="folio-gen">
+                <input id="c-folio" readonly value="${folioInicial}">
+                <button type="button" class="btn btn-ghost" id="btn-folio-nuevo">Otro</button>
+              </div>
+            </div>
           </div>
           <div class="form-row">
             <div class="field">
@@ -768,6 +783,10 @@
       toast('Usuario creado. ¡Ya puede iniciar sesión!');
       e.target.reset();
       renderAdminJugadores(body);
+    });
+
+    $('#btn-folio-nuevo').addEventListener('click', () => {
+      $('#c-folio').value = nuevoFolio();
     });
 
     wireUserActions(body);
