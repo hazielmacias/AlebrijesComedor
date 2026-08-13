@@ -550,12 +550,12 @@ select {
   background: #fff;
   border-radius: 10px;
   padding: 10px;
-  margin: 0 18px 14px;
+  margin: 0 auto 14px;
   flex-shrink: 0;
   line-height: 0;
   width: fit-content;
 }
-.credencial-qr img { display: block; width: 132px; height: 132px; }
+.credencial-qr img { display: block; width: 132px; height: 132px; max-width: 100%; }
 
 .credencial-info { flex: 1; min-width: 0; }
 .rol-tag {
@@ -834,8 +834,8 @@ tbody .folio { font-size: .78rem; }
 }
 .dialog h3 { font-family: var(--font-display); font-size: 1.15rem; letter-spacing: .03em; text-transform: uppercase; color: var(--bone); margin-bottom: 16px; }
 
-.qr-full { background: #fff; border-radius: var(--r); padding: 28px 20px 20px; text-align: center; }
-.qr-full img { display: block; margin: 0 auto; width: min(78vw, 62vh, 400px); height: auto; background: #fff; }
+.qr-full { background: #fff; border-radius: var(--r); padding: 26px 18px 18px; text-align: center; }
+.qr-full img { display: block; margin: 0 auto; width: 100%; max-width: min(78vw, 60vh, 400px); height: auto; background: #fff; }
 .qr-full .pc-name { color: #0B0B0B; margin-top: 14px; }
 .qr-full .pc-folio { color: var(--flame); margin-top: 6px; }
 .qr-full-hint { font-size: .8rem; color: #6b6155; margin-top: 10px; }
