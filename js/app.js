@@ -8,13 +8,14 @@
   const state = {
     user: null,
     perfil: null,
-    comidas: [],
     view: 'login',
     adminTab: 'jugadores',
     scanner: null,
     scanLock: false,
-    scanMuted: false,
   };
+
+  const COMIDAS = ['desayuno', 'comida', 'cena'];
+  const etiqueta = n => String(n || '').charAt(0).toUpperCase() + String(n || '').slice(1);
 
   const app = $('#app');
   const printRoot = $('#print-root');
@@ -41,18 +42,6 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  const nowHM = () => new Date().toTimeString().slice(0, 5);
-  const toMin = hm => { const [h, m] = hm.split(':').map(Number); return h * 60 + m; };
-
-  const mealStatus = c => {
-    const n = toMin(nowHM());
-    const start = toMin(c.inicio) - c.tolerancia_min;
-    const end = toMin(c.fin) + c.tolerancia_min;
-    if (n < start) return 'later';
-    if (n > end) return 'past';
-    return 'open';
-  };
-
   const fmtDT = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
   const fmtDia = iso => new Date(iso + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
   const fmtDiaLargo = iso => new Date(iso + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -63,11 +52,6 @@
     qr.make();
     return qr.createDataURL(6, 2);
   };
-
-  async function loadComidas() {
-    const { data } = await supabase.from('comidas_config').select('*').order('nombre');
-    state.comidas = data || [];
-  }
 
   const icon = (path) =>
     `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
@@ -145,7 +129,6 @@
       return;
     }
     state.perfil = data;
-    await loadComidas();
     state.view = data.rol === 'jugador' ? 'credencial' : 'escaneo';
     renderShell();
   }
@@ -237,19 +220,6 @@
         <button class="btn btn-ghost btn-block" id="btn-foto">${p.foto_url ? 'Cambiar foto de perfil' : 'Subir foto de perfil'}</button>
         <input type="file" id="input-foto" accept="image/*" hidden>
         <button class="btn btn-primary btn-block" id="btn-print" style="margin-top:10px">Imprimir / Guardar PDF</button>
-        <div class="card">
-          <div class="card-title">Horarios del comedor</div>
-          <div class="list">
-            ${state.comidas.map(c => `
-              <div class="list-row">
-                <div class="row-main">
-                  <div class="row-name">${esc(c.etiqueta)}</div>
-                  <div class="row-sub">${c.inicio.slice(0,5)} – ${c.fin.slice(0,5)} · tolerancia ${c.tolerancia_min} min</div>
-                </div>
-                <span class="badge ${mealStatus(c) === 'open' ? 'badge-ok' : 'badge-muted'}">${mealStatus(c) === 'open' ? 'Abierto' : mealStatus(c) === 'later' ? 'Más tarde' : 'Cerrado'}</span>
-              </div>`).join('')}
-          </div>
-        </div>
       </div>`;
 
     $('#btn-foto').addEventListener('click', () => $('#input-foto').click());
@@ -328,16 +298,13 @@
     const desde = addDays(todayLocal(), -6);
     const hasta = todayLocal();
 
-    const [asis, faltasAuto, faltasMan] = await Promise.all([
+    const [asis, faltasAuto] = await Promise.all([
       supabase.from('asistencias').select('*').eq('perfil_id', state.perfil.id).gte('dia', desde).lte('dia', hasta).order('dia', { ascending: false }).order('hora', { ascending: false }),
       supabase.rpc('faltas_automaticas', { p_desde: desde, p_hasta: hasta }),
-      supabase.from('faltas').select('*').eq('perfil_id', state.perfil.id).gte('dia', desde).lte('dia', hasta).order('dia', { ascending: false }),
     ]);
 
-    const etiquetas = Object.fromEntries(state.comidas.map(c => [c.nombre, c.etiqueta]));
     const registros = [...(asis.data || []).map(a => ({ dia: a.dia, comida: a.comida, hora: a.hora, tipo: 'asis' }))];
-    (faltasAuto.data || []).forEach(f => registros.push({ dia: f.dia, comida: f.comida, hora: null, tipo: 'auto' }));
-    (faltasMan.data || []).forEach(f => registros.push({ dia: f.dia, comida: f.comida, hora: null, tipo: f.tipo }));
+    (faltasAuto.data || []).filter(f => f.perfil_id === state.perfil.id).forEach(f => registros.push({ dia: f.dia, comida: f.comida, hora: null, tipo: 'auto' }));
     registros.sort((a, b) => b.dia.localeCompare(a.dia) || (b.hora || '').localeCompare(a.hora || ''));
 
     main.innerHTML = `
@@ -352,7 +319,7 @@
                 <div class="list-row">
                   <div class="row-main">
                     <div class="row-name">${esc(fmtDiaLargo(r.dia))}</div>
-                    <div class="row-sub">${esc(etiquetas[r.comida] || r.comida)}${r.hora ? ' · ' + fmtDT(r.hora) : ''}</div>
+                    <div class="row-sub">${esc(etiqueta(r.comida))}${r.hora ? ' · ' + fmtDT(r.hora) : ''}</div>
                   </div>
                   ${esAsis
                     ? '<span class="badge badge-ok">Comida registrada</span>'
@@ -368,7 +335,6 @@
   // ---------------------------------------------------------------- escáner (cocinera/admin)
 
   function renderEscaneo(main) {
-    const vigente = state.comidas.find(c => mealStatus(c) === 'open') || null;
     main.innerHTML = `
       <div class="view">
         <div class="view-title"><span>Escanear credencial</span></div>
@@ -376,10 +342,9 @@
         <div class="card">
           <div class="card-title">Comida a registrar</div>
           <div class="meal-picker" id="meal-picker">
-            ${state.comidas.map(c => `
-              <button class="meal-btn ${vigente && vigente.nombre === c.nombre ? 'active' : ''}" data-meal="${c.nombre}">
-                <span class="m-name">${esc(c.etiqueta)}</span>
-                <span class="m-time">${c.inicio.slice(0,5)}–${c.fin.slice(0,5)}</span>
+            ${COMIDAS.map(n => `
+              <button class="meal-btn ${n === (state.mealSel || 'desayuno') ? 'active' : ''}" data-meal="${n}">
+                <span class="m-name">${etiqueta(n)}</span>
               </button>`).join('')}
           </div>
         </div>
@@ -406,7 +371,7 @@
         </div>
       </div>`;
 
-    state.mealSel = vigente ? vigente.nombre : (state.comidas[0] || {}).nombre;
+    state.mealSel = state.mealSel || 'desayuno';
 
     $('#meal-picker').addEventListener('click', e => {
       const btn = e.target.closest('.meal-btn');
@@ -463,8 +428,7 @@
 
   async function registrarScan(folio) {
     if (state.scanLock) return;
-    const comidaSel = state.mealSel;
-    if (!comidaSel) { mostrarResultado('err', 'No hay comidas activas', 'Configura horarios en el panel.'); return; }
+    const comidaSel = state.mealSel || 'desayuno';
     state.scanLock = true;
     try {
       const { data: perfil } = await supabase.from('perfiles').select('*').eq('folio', folio).maybeSingle();
@@ -476,23 +440,15 @@
         mostrarResultado('err', `${esc(perfil.nombre)} no es jugador`, 'Solo las credenciales de jugador se registran en el comedor.');
         return;
       }
+      if (!perfil.activo) {
+        mostrarResultado('err', `${esc(perfil.nombre)} está bloqueado`, 'Hable con el administrador para reactivar su cuenta.');
+        return;
+      }
 
       const { data: dup } = await supabase.from('asistencias').select('id, hora')
         .eq('perfil_id', perfil.id).eq('comida', comidaSel).eq('dia', todayLocal()).maybeSingle();
       if (dup) {
         mostrarResultado('warn', `${esc(perfil.nombre)} ya está registrado`, `En ${etiqueta(comidaSel)} a las ${fmtDT(dup.hora)}. No se duplica.`);
-        return;
-      }
-
-      const config = state.comidas.find(c => c.nombre === comidaSel);
-      const abierto = config && mealStatus(config) === 'open';
-
-      if (!abierto) {
-        mostrarResultado('warn', `${esc(perfil.nombre)} fuera de horario`, `${etiqueta(comidaSel)} es de ${config.inicio.slice(0,5)} a ${config.fin.slice(0,5)}.`,
-          [
-            { label: 'Marcar falta', clase: 'btn-danger', fn: () => marcarFalta(perfil, comidaSel) },
-            { label: 'Registrar igual', fn: () => registrarAsistencia(perfil, comidaSel) },
-          ]);
         return;
       }
 
@@ -521,23 +477,6 @@
     cargarHoy();
   }
 
-  async function marcarFalta(perfil, comidaSel) {
-    const { error } = await supabase.from('faltas').insert({
-      perfil_id: perfil.id,
-      comida: comidaSel,
-      dia: todayLocal(),
-      tipo: 'manual',
-      nota: 'Fuera de horario',
-      registrado_por: state.perfil.id,
-    });
-    if (error) {
-      if (error.code === '23505') toast('La falta ya está registrada para esta comida.');
-      else toast('No se pudo registrar la falta: ' + error.message);
-      return;
-    }
-    toast(`Falta registrada para ${perfil.nombre}.`);
-  }
-
   function mostrarResultado(tipo, titulo, sub, acciones) {
     const el = $('#scan-result');
     if (!el) return;
@@ -555,8 +494,6 @@
       el.querySelectorAll('[data-acc]').forEach((b, i) => b.addEventListener('click', acciones[i].fn));
     }
   }
-
-  const etiqueta = nombre => (state.comidas.find(c => c.nombre === nombre) || {}).etiqueta || nombre;
 
   async function cargarHoy() {
     const box = $('#today-list');
@@ -596,25 +533,18 @@
   async function renderHoy(main) {
     main.innerHTML = `<div class="view"><div class="view-title">Registros de hoy</div><div class="empty">Cargando…</div></div>`;
 
-    const [asis, faltas] = await Promise.all([
-      supabase.from('asistencias')
-        .select('id, comida, hora, perfil:perfiles!asistencias_perfil_id_fkey(folio, nombre)')
-        .eq('dia', todayLocal()).order('hora', { ascending: false }),
-      supabase.from('faltas')
-        .select('id, comida, tipo, nota, perfil:perfiles!faltas_perfil_id_fkey(folio, nombre)')
-        .eq('dia', todayLocal()).order('creado_en', { ascending: false }),
-    ]);
+    const { data } = await supabase.from('asistencias')
+      .select('id, comida, hora, perfil:perfiles!asistencias_perfil_id_fkey(folio, nombre)')
+      .eq('dia', todayLocal()).order('hora', { ascending: false });
 
-    const asisList = asis.data || [];
-    const faltasList = faltas.data || [];
+    const asisList = data || [];
 
     main.innerHTML = `
       <div class="view">
         <div class="view-title"><span>Registros de hoy</span><span class="small">${esc(fmtDiaLargo(todayLocal()))}</span></div>
         <div class="stats">
           <div class="stat"><div class="n ok">${asisList.length}</div><div class="l">Comidas</div></div>
-          <div class="stat"><div class="n bad">${faltasList.length}</div><div class="l">Faltas</div></div>
-          <div class="stat"><div class="n">${state.comidas.length}</div><div class="l">Servicios</div></div>
+          <div class="stat"><div class="n">${COMIDAS.length}</div><div class="l">Servicios</div></div>
         </div>
 
         <div class="card">
@@ -631,20 +561,6 @@
                   <span class="chip">${fmtDT(a.hora)}</span>
                 </div>`).join('')}</div>`}
         </div>
-
-        <div class="card">
-          <div class="card-title">Faltas registradas hoy</div>
-          ${faltasList.length === 0
-            ? '<div class="empty">Sin faltas hoy.</div>'
-            : `<div class="list">${faltasList.map(f => `
-                <div class="list-row">
-                  <div class="row-main">
-                    <div class="row-name">${esc(f.perfil?.nombre || '—')}</div>
-                    <div class="row-sub">${esc(etiqueta(f.comida))}${f.nota ? ' · ' + esc(f.nota) : ''}</div>
-                  </div>
-                  <span class="badge ${f.tipo === 'justificada' ? 'badge-warn' : 'badge-bad'}">${f.tipo === 'justificada' ? 'Justificada' : 'Falta'}</span>
-                </div>`).join('')}</div>`}
-        </div>
       </div>`;
   }
 
@@ -655,9 +571,9 @@
       <div class="view">
         <div class="view-title">Panel de administración</div>
         <div class="tabs">
-          ${['jugadores', 'horarios', 'reporte'].map(t =>
+          ${['jugadores', 'reporte'].map(t =>
             `<button class="tab-btn ${state.adminTab === t ? 'active' : ''}" data-tab="${t}">${
-              t === 'jugadores' ? 'Jugadores' : t === 'horarios' ? 'Horarios' : 'Reporte'}</button>`).join('')}
+              t === 'jugadores' ? 'Jugadores' : 'Reporte'}</button>`).join('')}
         </div>
         <div id="admin-body"></div>
       </div>`;
@@ -669,7 +585,6 @@
 
     const body = $('#admin-body');
     if (state.adminTab === 'jugadores') renderAdminJugadores(body);
-    else if (state.adminTab === 'horarios') renderAdminHorarios(body);
     else renderAdminReporte(body);
   }
 
@@ -792,45 +707,6 @@
     }));
   }
 
-  async function renderAdminHorarios(body) {
-    body.innerHTML = '<div class="empty">Cargando…</div>';
-    await loadComidas();
-    body.innerHTML = `<div class="form" id="form-horarios">
-      ${state.comidas.map(c => `
-        <div class="card">
-          <div class="card-title">${esc(c.etiqueta)}</div>
-          <div class="form">
-            <div class="form-row">
-              <div class="field"><label>Apertura</label><input type="time" data-c="${c.nombre}" data-k="inicio" value="${c.inicio.slice(0,5)}"></div>
-              <div class="field"><label>Cierre</label><input type="time" data-c="${c.nombre}" data-k="fin" value="${c.fin.slice(0,5)}"></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label>Tolerancia (min)</label><input type="number" data-c="${c.nombre}" data-k="tolerancia_min" value="${c.tolerancia_min}" min="0" max="120"></div>
-              <div class="check-row"><input type="checkbox" data-c="${c.nombre}" data-k="activo" ${c.activo ? 'checked' : ''}><span>Servicio activo</span></div>
-            </div>
-          </div>
-        </div>`).join('')}
-      <button class="btn btn-primary btn-block" type="submit">Guardar horarios</button>
-    </div>`;
-
-    $('#form-horarios').addEventListener('submit', async e => {
-      e.preventDefault();
-      const updates = state.comidas.map(c => {
-        const u = { nombre: c.nombre, etiqueta: c.etiqueta };
-        u.inicio = $(`[data-c="${c.nombre}"][data-k="inicio"]`).value + ':00';
-        u.fin = $(`[data-c="${c.nombre}"][data-k="fin"]`).value + ':00';
-        u.tolerancia_min = Number($(`[data-c="${c.nombre}"][data-k="tolerancia_min"]`).value);
-        u.activo = $(`[data-c="${c.nombre}"][data-k="activo"]`).checked;
-        return u;
-      });
-      const results = await Promise.all(updates.map(u => supabase.from('comidas_config').update(u).eq('nombre', u.nombre)));
-      const err = results.find(r => r.error);
-      if (err) { toast('Error al guardar: ' + err.error.message); return; }
-      await loadComidas();
-      toast('Horarios guardados.');
-    });
-  }
-
   async function renderAdminReporte(body) {
     body.innerHTML = '<div class="empty">Cargando…</div>';
     const hoy = todayLocal();
@@ -852,33 +728,14 @@
     if (!desde || !hasta || desde > hasta) { toast('Rango de fechas inválido.'); return; }
     box.innerHTML = '<div class="empty">Generando reporte…</div>';
 
-    const [auto, manual, asis] = await Promise.all([
+    const [faltas, asis] = await Promise.all([
       supabase.rpc('faltas_automaticas', { p_desde: desde, p_hasta: hasta }),
-      supabase.from('faltas')
-        .select('id, perfil_id, comida, dia, tipo, nota, perfil:perfiles!faltas_perfil_id_fkey(folio, nombre, foto_url)')
-        .gte('dia', desde).lte('dia', hasta).order('dia', { ascending: true }),
       supabase.from('asistencias')
         .select('id, perfil_id, comida, dia, hora, perfil:perfiles!asistencias_perfil_id_fkey(folio, nombre, foto_url)')
         .gte('dia', desde).lte('dia', hasta).order('dia', { ascending: true }).order('hora', { ascending: true }),
     ]);
 
-    const manuales = manual.data || [];
-    const porClave = {};
-    manuales.forEach(m => {
-      const k = `${m.perfil_id}|${m.comida}|${m.dia}`;
-      porClave[k] = { perfil_id: m.perfil_id, comida: m.comida, dia: m.dia, id: m.id, tipo: m.tipo, nota: m.nota, folio: m.perfil?.folio, nombre: m.perfil?.nombre, foto_url: m.perfil?.foto_url };
-    });
-
-    const filas = [];
-    (auto.data || []).forEach(f => {
-      const k = `${f.perfil_id}|${f.comida}|${f.dia}`;
-      if (!porClave[k]) {
-        filas.push({ perfil_id: f.perfil_id, folio: f.folio, nombre: f.nombre, comida: f.comida, dia: f.dia, tipo: 'automática', nota: '', id: null, foto_url: f.foto_url });
-      }
-    });
-    Object.values(porClave).forEach(m => filas.push({
-      perfil_id: m.perfil_id, folio: m.folio, nombre: m.nombre, comida: m.comida, dia: m.dia, tipo: m.tipo, nota: m.nota, id: m.id, foto_url: m.foto_url,
-    }));
+    const filas = faltas.data || [];
     filas.sort((a, b) => a.dia.localeCompare(b.dia) || a.nombre.localeCompare(b.nombre));
 
     const asisList = asis.data || [];
@@ -897,12 +754,7 @@
                     <div class="row-name">${esc(f.nombre || '—')}</div>
                     <div class="row-sub"><span class="folio">${esc(f.folio || '—')}</span> · ${esc(fmtDiaLargo(f.dia))} · ${esc(etiqueta(f.comida))}</div>
                   </div>
-                  ${f.tipo === 'justificada'
-                    ? `<span class="badge badge-warn">Justificada</span>`
-                    : `<span class="badge badge-bad">Falta ${f.tipo === 'manual' ? '· manual' : ''}</span>`}
-                  ${f.tipo !== 'justificada' && state.perfil.rol === 'administrador'
-                    ? `<button class="btn btn-ghost" data-just="${f.perfil_id}|${f.comida}|${f.dia}" title="Justificar">Justificar</button>`
-                    : ''}
+                  <span class="badge badge-bad">Falta</span>
                 </div>`).join('')}
             </div>`}
       </div>
@@ -925,31 +777,6 @@
               </tbody>
             </table></div>`}
       </div>`;
-
-    if (!sinFaltas) {
-      box.querySelectorAll('[data-just]').forEach(b => b.addEventListener('click', async () => {
-        const [pid, comida, dia] = b.dataset.just.split('|');
-        abrirDialogo(`
-          <h3>Justificar falta</h3>
-          <div class="field"><label>Motivo</label><input id="d-nota" placeholder="Ej. cita médica, permiso…"></div>
-          <div class="dialog-actions">
-            <button class="btn btn-ghost" data-cerrar>Cancelar</button>
-            <button class="btn btn-primary" id="d-ok">Justificar</button>
-          </div>`);
-        $('#d-ok').addEventListener('click', async () => {
-          const nota = $('#d-nota').value.trim() || 'Sin motivo';
-          const { data: existe } = await supabase.from('faltas').select('id').eq('perfil_id', pid).eq('comida', comida).eq('dia', dia).maybeSingle();
-          if (existe) {
-            await supabase.from('faltas').update({ tipo: 'justificada', nota }).eq('id', existe.id);
-          } else {
-            await supabase.from('faltas').insert({ perfil_id: pid, comida, dia, tipo: 'justificada', nota, registrado_por: state.perfil.id });
-          }
-          cerrarDialogo();
-          toast('Falta justificada.');
-          generarReporte(desde, hasta, box);
-        });
-      }));
-    }
 
     box.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
       await supabase.from('asistencias').delete().eq('id', b.dataset.del);

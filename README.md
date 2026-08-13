@@ -2,9 +2,9 @@
 
 App web para registrar las comidas de los jugadores de la casa club mediante QR.
 
-- **Jugadores:** inician sesión y ven su credencial con QR digital, foto de perfil y tarjeta imprimible (PDF). Pueden subir/cambiar su foto desde su perfil.
-- **Cocineras:** escanean el QR con la cámara del celular para registrar Desayuno, Comida y Cena. Bloquea duplicados y registra faltas manuales.
-- **Administrador:** crea usuarios, configura horarios con tolerancia y ve el reporte de faltas (automáticas y manuales) con foto de cada jugador, pudiendo justificarlas.
+- **Jugadores:** inician sesión y ven su credencial con QR digital, foto de perfil y tarjeta imprimible (PDF) a pantalla completa. Pueden subir/cambiar su foto desde su perfil.
+- **Cocineras:** eligen la comida (Desayuno, Comida o Cena — el horario lo decide su celular) y escanean el QR con la cámara. Bloquea duplicados.
+- **Administrador:** crea usuarios y ve el reporte de faltas automáticas (el jugador que no se registró en la comida del día no pasó al comedor) con foto de cada jugador.
 
 ## Stack
 
@@ -48,25 +48,18 @@ App web para registrar las comidas de los jugadores de la casa club mediante QR.
 
 ## 4. Uso diario
 
-1. **El administrador** entra, va a *Panel → Jugadores* y crea a cada jugador (nombre, folio, usuario y contraseña).
+1. **El administrador** entra, va a *Panel → Jugadores* y crea a cada jugador (nombre, folio de 4 dígitos, usuario y contraseña).
 2. **El jugador** entra con su usuario, ve su credencial con QR y foto, pulsa *Subir foto de perfil* para agregarla y *Imprimir / Guardar PDF* para llevarla impresa (la foto aparece también en el PDF).
-3. **La cocinera** abre la app en su celular, pulsa *Escanear*, elige la comida (se preselecciona la del momento) y apunta la cámara al QR de cada jugador.
-   - Dentro del horario (+ tolerancia): se registra la comida.
-   - Fuera de horario: avisa y permite registrar falta manual.
-   - QR repetido en la misma comida: avisa «ya registrado», no duplica.
-4. **El administrador** ve el *Reporte* de faltas por rango de fechas (con foto de cada jugador), las justifica con motivo, y puede corregir registros.
+3. **La cocinera** abre la app en su celular, pulsa *Escanear*, elige la comida que está sirviendo (Desayuno, Comida o Cena) y apunta la cámara al QR de cada jugador.
+   - El QR del jugador se registra al momento; si ya estaba registrado en esa comida, avisa «ya registrado» y no duplica.
+   - Las faltas son automáticas: el jugador que **no se registró** en una comida del día queda como falta en el reporte.
+4. **El administrador** ve el *Reporte* de faltas automáticas por rango de fechas (con foto de cada jugador) y puede corregir registros.
 
-## 5. Horarios por defecto
+## 5. Folios
 
-| Comida | Horario | Tolerancia |
-|---|---|---|
-| Desayuno | 07:00 – 09:00 | 15 min |
-| Comida | 13:00 – 15:00 | 15 min |
-| Cena | 19:00 – 21:00 | 15 min |
-
-Se cambian en *Panel → Horarios*. Una falta automática cuenta cuando el jugador **no escanea** dentro del horario + tolerancia de una comida activa.
+- Cada jugador tiene un folio único de **4 dígitos** (solo números, ej. `0012`). El QR de la credencial codifica ese folio y es lo que escanea la cocinera.
 
 ## Notas de seguridad
 
 - La clave pública de Supabase está en `js/config.js`; es de solo lectura para datos privados (los permisos reales los impone la base de datos).
-- El jugador solo ve su propio perfil; las cocineras solo registran; solo el admin administra usuarios y justifica faltas.
+- El jugador solo ve su propio perfil; las cocineras solo registran; solo el admin administra usuarios.
