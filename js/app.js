@@ -804,6 +804,7 @@
         <span class="badge ${p.activo ? 'badge-ok' : 'badge-muted'}">${p.activo ? 'Activo' : 'Inactivo'}</span>
         <button class="btn-icon" data-reset="${p.folio}" title="Cambiar contraseña">Clave</button>
         <button class="btn-icon" data-toggle="${p.id}" title="Activar/desactivar">${p.activo ? 'Bloquear' : 'Activar'}</button>
+        ${p.id !== state.perfil?.id ? `<button class="btn-icon btn-danger" data-eliminar="${p.id}" data-eliminar-nombre="${esc(p.nombre)}" data-eliminar-folio="${esc(p.folio)}" title="Eliminar usuario">Eliminar</button>` : ''}
       </div>`;
   }
 
@@ -832,6 +833,27 @@
       if (error) { toast(error.message); return; }
       toast('Estado actualizado.');
       renderAdminJugadores(body);
+    }));
+
+    body.querySelectorAll('[data-eliminar]').forEach(b => b.addEventListener('click', () => {
+      const nombre = b.dataset.eliminarNombre;
+      const folio = b.dataset.eliminarFolio;
+      abrirDialogo(`
+        <h3>Eliminar usuario</h3>
+        <p style="color:var(--bone)">¿Seguro que quieres eliminar a <strong>${esc(nombre)}</strong> (folio ${esc(folio)})?<br>Se borrará su cuenta y todas sus asistencias. No se puede deshacer.</p>
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" data-cerrar>Cancelar</button>
+          <button class="btn btn-danger" id="d-eliminar">Sí, eliminar</button>
+        </div>`);
+      $('#d-eliminar').addEventListener('click', async () => {
+        const btnD = $('#d-eliminar');
+        btnD.disabled = true;
+        const { error } = await supabase.rpc('eliminar_usuario', { p_id: b.dataset.eliminar });
+        cerrarDialogo();
+        if (error) { toast(error.message.replace(/^P0001:\s*/, '')); return; }
+        toast(`Usuario ${esc(folio)} eliminado.`);
+        renderAdminJugadores(body);
+      });
     }));
   }
 
