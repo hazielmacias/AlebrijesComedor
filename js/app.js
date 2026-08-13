@@ -403,19 +403,33 @@
       return;
     }
 
-    const configs = [{ facingMode: 'environment' }, { facingMode: 'user' }];
+    const configs = [
+      { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+    ];
+    try {
+      const cams = await Promise.race([
+        Html5Qrcode.getCameras(),
+        new Promise(r => setTimeout(() => r(null), 1500)),
+      ]);
+      (cams || []).forEach(c => configs.push({ deviceId: { exact: c.id } }));
+    } catch {}
+
+    let ultimoError = 'No se pudo acceder a la cámara';
     try {
       const cams = await Html5Qrcode.getCameras();
       (cams || []).forEach(c => configs.push({ deviceId: { exact: c.id } }));
     } catch {}
 
-    let ultimoError = 'No se pudo acceder a la cámara';
     for (const cfg of configs) {
       if (state.scanner) { try { state.scanner.stop().catch(() => {}); } catch {} state.scanner = null; }
       frame.innerHTML = '<div class="scanner-off"><p>Iniciando cámara…</p></div>';
       try {
         state.scanner = new Html5Qrcode('scanner-frame');
-        await state.scanner.start(cfg, { fps: 8, qrbox: { width: 230, height: 230 } }, text => {
+        await state.scanner.start(cfg, {
+          fps: 8,
+          qrbox: (vw, vh) => ({ width: Math.floor(vw * 0.7), height: Math.floor(vh * 0.7) }),
+        }, text => {
           registrarScan(String(text).trim().toUpperCase()).then(ok => { if (ok) stopScanner(); });
         }, () => {});
         return;
